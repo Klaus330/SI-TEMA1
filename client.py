@@ -38,23 +38,12 @@ def start():
     send("OK")
 
     line = receive()
-    send('OK')
     while line: 
         print(f"{line}")
         line = receive()
-
         if line == DISCONNECT_MESSAGE:
             break;
 
-
-        send('OK')
-
     print(f"[CLIENT] FILE TRANSFERED")
-
-
-    # while True:
-    #     messageToSend = input();
-    #     send(messageToSend);
-    #     receive();
 
 start();

@@ -26,27 +26,15 @@ def handle_client(conn, addr):
         return;
 
     file = open('file.txt', 'r')
-    line = file.readline()
-    while line:
+
+    for line in file:
         sendResponse(conn, line)
         line = file.readline()
-        msg = receiveMessage(conn, addr)
-        print(f'[RECEIVED] {msg} - LINE: {line}')
-        if msg != CONNECTION_SUCCESSFUL:
-            print('CONNECTION went wrong')
-            conn.close()
-            return;
-    
+        print(f"READ: {line}")
+    file.close()
+
     print('[SERVER] FILE TRANSFERED')
     sendResponse(conn,"!DISCONNECT")
-    # while connected:
-    #     print("Connected")
-    #     receivedMessage = receiveMessage(conn, addr)
-
-    #     if receivedMessage == DISCONNECT_MESSAGE:
-    #         sendResponse(conn, "!DISCONNECT")    
-    #         connected = False
-    #     sendResponse(conn, f"Received {receivedMessage}")
 
     conn.close()
         
