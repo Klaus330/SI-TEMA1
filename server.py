@@ -1,21 +1,28 @@
 import socket 
 import threading
+import socket 
+import threading
+import hashlib
+from Crypto import Random
+from Crypto.Cipher import AES
 
-HEADER = 64
+from aescipher import AESCipher
+
+HEADER = 32
 PORT = 5050
 SERVER = socket.gethostbyname(socket.gethostname())
 ADDR = (SERVER, PORT)
 FORMAT = 'utf-8'
 DISCONNECT_MESSAGE = "!DISCONNECT"
 PRIVATE_KEY = ''
-PUBLIC_KEY = 'securiatatea_informatiei'
+PUBLIC_KEY = 'securiatatea_informatiei'.encode(FORMAT)
+IV = "aabbccddeeffgghh".encode(FORMAT)
 CONNECTION_SUCCESSFUL = 'OK'
 
 def handle_client(conn, addr):
     print(f"[NEW CONNECTION] {addr} connected.")
 
-    connected = True
-    sendResponse(conn, 'ECB')
+    sendResponse(conn, 'ECB'.encode('utf-8'))
     receiveMessage(conn, addr)
     sendResponse(conn, PRIVATE_KEY)
     msg = receiveMessage(conn, addr)
@@ -23,18 +30,24 @@ def handle_client(conn, addr):
     if msg != CONNECTION_SUCCESSFUL:
         print('WRONG CONNECTION')
         conn.close()
-        return;
+        return
 
-    file = open('file.txt', 'r')
 
-    for line in file:
-        sendResponse(conn, line)
-        line = file.readline()
-        print(f"READ: {line}")
-    file.close()
+    cryptedFileBlocks = getCryptedFiles()
+    print(cryptedFileBlocks)
+    for block in cryptedFileBlocks:
+        sendResponse(conn, block)
+
+    # file = open('file.txt', 'r')
+
+    # for line in file:
+    #     sendResponse(conn, line.encode(FORMAT))
+    #     line = file.readline()
+    #     print(f"READ: {line}")
+    # file.close()
 
     print('[SERVER] FILE TRANSFERED')
-    sendResponse(conn,"!DISCONNECT")
+    # sendResponse(conn,"!DISCONNECT".encode(FORMAT))
 
     conn.close()
         
@@ -49,21 +62,23 @@ def receiveMessage(conn, addr):
 
 def sendResponse(conn, response):
     responseLength = str(len(response)).encode(FORMAT)
-    responseLength += b' ' * (HEADER - len(response))
+    responseLength += b' ' * (HEADER - len(responseLength))
     conn.send(responseLength)
-    conn.send(response.encode(FORMAT))
+    conn.send(response)
 
 
 def fetchEncryptionKey():
     global PRIVATE_KEY
     clientKM = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    clientKM.connect(("192.168.56.1", 5051))
+    clientKM.connect(("127.0.1.1", 5051))
+    
     # receive welcome message
-    messageLength = clientKM.recv(HEADER).decode(FORMAT)
+    messageLength = clientKM.recv(HEADER)
     if(messageLength):
-        messageLength = int(messageLength)
-        message = clientKM.recv(messageLength).decode(FORMAT)
-        print(f"[SERVER] {message}")
+        messageLength = int(messageLength.strip())
+        message = clientKM.recv(messageLength)
+        # print(f"[SERVER] {message}")
+
     # send identity
     message = "Give me THE KEY".encode(FORMAT)
     lengthToSend = str(len(message)).encode(FORMAT)
@@ -71,20 +86,34 @@ def fetchEncryptionKey():
     clientKM.send(lengthToSend)
     clientKM.send(message)
     
-    messageLength = clientKM.recv(HEADER).decode(FORMAT)
+    messageLength = clientKM.recv(HEADER)
     if(messageLength):
         messageLength = int(messageLength)
-        message = clientKM.recv(messageLength).decode(FORMAT)
-        PRIVATE_KEY = message
-        print(f"[SERVER] {message}")
-    
+        message = clientKM.recv(messageLength)
+        PRIVATE_KEY = decryptPrivateKey(message)
+        print(f"[DECRYPTED KEY]{PRIVATE_KEY}")
+
+
+def decryptPrivateKey(key):
+    cipher = AES.new(PUBLIC_KEY, AES.MODE_ECB)
+    return cipher.decrypt(key)
+
+
+def getCryptedFiles():
+    file = open('file.txt', 'r')
+    print("LINES")
+    cipher = AESCipher(PRIVATE_KEY, IV, HEADER)
+    blocks = cipher.encryptECB(file.read())
+    file.close()
+
+    return blocks
 
 def start():
 
     fetchEncryptionKey()
-    print(f"KEY: {PRIVATE_KEY}")
     
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
     server.bind(ADDR)
     server.listen()
     print(f"[LISTENING] Server is listening on {SERVER}")

@@ -1,49 +1,66 @@
 import socket
 
-HEADER = 64
+from aescipher import AESCipher
+
+HEADER = 32
 PORT = 5050
 FORMAT = 'utf-8'
 DISCONNECT_MESSAGE = "!DISCONNECT"
-SERVER = "192.168.56.1"
+SERVER = socket.gethostbyname(socket.gethostname())
 ADDR = (SERVER, PORT)
 PUBLIC_KEY = 'securiatatea_informatiei'
 PRIVATE_KEY = ''
 ENCRYPTION_MODE = ''
+PUBLIC_KEY = 'securiatatea_informatiei'.encode(FORMAT)
+IV = "aabbccddeeffgghhiijjkkllmmnnoopp".encode(FORMAT)
+
+
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 client.connect(ADDR)
 
-def send(msg):
-    message = msg.encode(FORMAT)
+def send(message):
     lengthToSend = str(len(message)).encode(FORMAT)
     lengthToSend += b' ' * (HEADER - len(message))
     client.send(lengthToSend)
     client.send(message)
 
 def receive():
-    messageLength = client.recv(HEADER).decode(FORMAT)
+    messageLength = client.recv(HEADER)
     if(messageLength):
         messageLength = int(messageLength)
-        message = client.recv(messageLength).decode(FORMAT)
-        # print(f"[SERVER] {message}")        
+        message = client.recv(messageLength)
+        print(f"[SERVER] {message}")        
         if message == DISCONNECT_MESSAGE:
             exit()
         return message
 
+
+def decryptReceivedMessage(blocks):
+    cipher = AESCipher(PRIVATE_KEY, IV, HEADER)
+    return cipher.decryptECB(blocks)
+
 def start():
+    global PRIVATE_KEY
     ENCRYPTION_MODE = receive()
-    send("Mode")
+    send("Mode".encode(FORMAT))
     PRIVATE_KEY = receive()
     print(f"[RECEIVED] ENCRYPTION: {ENCRYPTION_MODE}")
     print(f"[RECEIVED] KEY: {PRIVATE_KEY}")
-    send("OK")
+    send("OK".encode(FORMAT))
 
+    blocks = []
     line = receive()
     while line: 
-        print(f"{line}")
+        blocks.append(line)
         line = receive()
-        if line == DISCONNECT_MESSAGE:
-            break;
+            
+    print("Mesajul criptat primit este:")    
+    print(blocks)
+    print()
+    print("Mesajul decriptat este:")
+    print(decryptReceivedMessage(blocks))
+
 
     print(f"[CLIENT] FILE TRANSFERED")
 
-start();
+start()
