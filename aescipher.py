@@ -4,6 +4,8 @@ from Crypto import Random
 from Crypto.Cipher import AES
 
 class AESCipher(object):
+    MODE_ECB = 'ecb'
+    MODE_CFB = 'cfb'
 
     def __init__(self, key, IV, bufferSize): 
         self.bs = AES.block_size
@@ -11,20 +13,24 @@ class AESCipher(object):
         self.iv = IV
         self.bufferSize = bufferSize
 
-
     def encrypt(self, raw, mode):
-         mode = 'ecb'
+        if mode == self.MODE_ECB:
+            return self.encryptECB(raw)
+        if mode == self.MODE_CFB:
+            encrypted = self.encryptCFB(raw)
+            return encrypted
 
-         if mode == 'ecb':
-             self.encryptECB(raw)
+    def decrypt(self, encrypted, mode):
+        if mode == self.MODE_ECB:
+            return self.decryptECB(encrypted)
+        if mode == self.MODE_CFB:
+            return self.decryptCFB(encrypted)
+
     
-
     def encryptECB(self, rawData):
         
         blocks = [rawData[i:i+16] for i in range(0, len(rawData), 16)]
-
-        # padd the last array item to match the constraints
-        blocks[-1] += ' ' * (16-len(blocks[-1]))
+        blocks[-1] += ' ' * (16-len(blocks[-1])) # padding
 
         crypted_blocks = []
         cipher = AES.new(self.key, AES.MODE_ECB)
@@ -53,27 +59,44 @@ class AESCipher(object):
     def padding(self, raw):
         return b" " * (self.bufferSize - len(raw))
 
-
     def unpad(something, plain_text):
-        
         last_character = plain_text[len(plain_text) - 1:]
         return plain_text[:-ord(last_character)]
 
-    # def encrypt(self, raw):
-    #     raw = self._pad(raw)
-    #     iv = Random.new().read(AES.block_size)
-    #     cipher = AES.new(self.key, AES.MODE_CBC, iv)
-    #     return base64.b64encode(iv + cipher.encrypt(raw.encode()))
+    def xor(something, var, key):
+        return bytes(a ^ b for a, b in zip(var, key))
 
-    # def decrypt(self, enc):
-    #     enc = base64.b64decode(enc)
-    #     iv = enc[:AES.block_size]
-    #     cipher = AES.new(self.key, AES.MODE_CBC, iv)
-    #     return self._unpad(cipher.decrypt(enc[AES.block_size:])).decode('utf-8')
+    def encryptCFB(self, plainText):
+        blocks = [plainText[i:i+16] for i in range(0, len(plainText), 16)]
+        blocks[-1] += ' ' * (16-len(blocks[-1])) # padding
 
-    # def _pad(self, s):
-    #     return s + (self.bs - len(s) % self.bs) * chr(self.bs - len(s) % self.bs)
+        blocks = [block.encode('utf-8') for block in blocks]
+        cipher = AES.new(self.key, AES.MODE_CFB, self.iv)
+        cryptedIV = cipher.encrypt(self.iv)
+        crypted_blocks = []
 
-    # @staticmethod
-    # def _unpad(s):
-    #     return s[:-ord(s[len(s)-1:])]
+        tmpCrypted = self.xor(cryptedIV, blocks[0])
+        crypted_blocks.append(tmpCrypted)
+        for block in blocks[1:]:
+            tmpCrypted = cipher.encrypt(tmpCrypted)
+            tmpCrypted = self.xor(tmpCrypted, block)
+            crypted_blocks.append(tmpCrypted)
+
+        return crypted_blocks
+
+    def decryptCFB(self, cryptedText):
+        decryptedBlocks = []
+        cipher = AES.new(self.key, AES.MODE_CFB, self.iv)
+        cryptedIV = cipher.encrypt(self.iv)
+
+        #decrypt first block
+        tmpDecrypted = self.xor(cryptedIV, cryptedText[0])
+        decryptedBlocks.append(tmpDecrypted.decode())
+        lastCrypted = cryptedText[0]
+        for cryptedBlock in cryptedText[1:]:
+            reEncrypted = cipher.encrypt(lastCrypted)
+            tmpDecrypted = self.xor(reEncrypted, cryptedBlock)
+            lastCrypted = cryptedBlock
+            decryptedBlocks.append(tmpDecrypted.decode())
+        
+        return "".join(decryptedBlocks).strip()

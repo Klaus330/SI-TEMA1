@@ -1,3 +1,4 @@
+import random
 import socket 
 import threading
 import socket 
@@ -18,11 +19,11 @@ PRIVATE_KEY = ''
 PUBLIC_KEY = 'securiatatea_informatiei'.encode(FORMAT)
 IV = "aabbccddeeffgghh".encode(FORMAT)
 CONNECTION_SUCCESSFUL = 'OK'
-
+ENCRYPTION_MODE = ''
 def handle_client(conn, addr):
     print(f"[NEW CONNECTION] {addr} connected.")
 
-    sendResponse(conn, 'ECB'.encode('utf-8'))
+    sendResponse(conn, ENCRYPTION_MODE.encode(FORMAT))
     receiveMessage(conn, addr)
     sendResponse(conn, PRIVATE_KEY)
     msg = receiveMessage(conn, addr)
@@ -38,16 +39,7 @@ def handle_client(conn, addr):
     for block in cryptedFileBlocks:
         sendResponse(conn, block)
 
-    # file = open('file.txt', 'r')
-
-    # for line in file:
-    #     sendResponse(conn, line.encode(FORMAT))
-    #     line = file.readline()
-    #     print(f"READ: {line}")
-    # file.close()
-
     print('[SERVER] FILE TRANSFERED')
-    # sendResponse(conn,"!DISCONNECT".encode(FORMAT))
 
     conn.close()
         
@@ -101,17 +93,18 @@ def decryptPrivateKey(key):
 
 def getCryptedFiles():
     file = open('file.txt', 'r')
-    print("LINES")
     cipher = AESCipher(PRIVATE_KEY, IV, HEADER)
-    blocks = cipher.encryptECB(file.read())
+    blocks = cipher.encrypt(file.read(), ENCRYPTION_MODE)
     file.close()
 
     return blocks
 
 def start():
+    global ENCRYPTION_MODE
 
     fetchEncryptionKey()
-    
+    ENCRYPTION_MODE = random.choice([AESCipher.MODE_ECB, AESCipher.MODE_CFB])
+ 
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
     server.bind(ADDR)

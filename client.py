@@ -12,7 +12,7 @@ PUBLIC_KEY = 'securiatatea_informatiei'
 PRIVATE_KEY = ''
 ENCRYPTION_MODE = ''
 PUBLIC_KEY = 'securiatatea_informatiei'.encode(FORMAT)
-IV = "aabbccddeeffgghhiijjkkllmmnnoopp".encode(FORMAT)
+IV = "aabbccddeeffgghh".encode(FORMAT)
 
 
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -36,15 +36,16 @@ def receive():
 
 
 def decryptReceivedMessage(blocks):
+    
     cipher = AESCipher(PRIVATE_KEY, IV, HEADER)
-    return cipher.decryptECB(blocks)
+    return cipher.decrypt(blocks, ENCRYPTION_MODE.decode())
 
 def start():
-    global PRIVATE_KEY
+    global PRIVATE_KEY, ENCRYPTION_MODE
     ENCRYPTION_MODE = receive()
     send("Mode".encode(FORMAT))
     PRIVATE_KEY = receive()
-    print(f"[RECEIVED] ENCRYPTION: {ENCRYPTION_MODE}")
+    print(f"[RECEIVED] ENCRYPTION: {ENCRYPTION_MODE.decode()}")
     print(f"[RECEIVED] KEY: {PRIVATE_KEY}")
     send("OK".encode(FORMAT))
 
